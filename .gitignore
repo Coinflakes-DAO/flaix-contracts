@@ -1,0 +1,9 @@
+# Foundry files
+cache/
+out/
+broadcast/
+lib/
+
+# Dotenv file
+.env
+

@@ -1,0 +1,19 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "shell",
+			"command": "forge test -vvv",
+			"problemMatcher": [],
+			"label": "flaix-contracts: forge test",
+			"detail": "Run forge test command for flaix-contracts project"
+		},
+		{
+			"type": "shell",
+			"command": "forge test -vvv --mt \"_only\"",
+			"problemMatcher": [],
+			"label": "flaix-contracts: forge test 'only'",
+			"detail": "Run forge test command for flaix-contracts with \"_only\" suffix"
+		}
+	]
+}
