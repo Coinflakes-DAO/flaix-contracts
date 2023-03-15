@@ -1,3 +1,7 @@
+[![Unit Tests](https://github.com/Coinflakes-DAO/flaix-contracts/actions/workflows/test.yml/badge.svg)](https://github.com/Coinflakes-DAO/flaix-contracts/actions/workflows/test.yml)
+
+[![Slither Analysis](https://github.com/Coinflakes-DAO/flaix-contracts/actions/workflows/slither.yml/badge.svg)](https://github.com/Coinflakes-DAO/flaix-contracts/actions/workflows/slither.yml)
+
 # Coinflakes DAO
 
 ## Investment Vault: Decentralized AI & Crypto Projects

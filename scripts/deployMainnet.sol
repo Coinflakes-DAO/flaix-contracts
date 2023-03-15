@@ -9,17 +9,10 @@ import "@src/FlaixOptionFactory.sol";
 import "@src/FlaixTestGov.sol";
 import "@mock-tokens/MockERC20.sol";
 
-contract FlaixDeploySepolia is Script {
+contract DeployMainnet is Script {
     function run() public {
         uint deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
-
-        address mockErc20 = address(new MockERC20("Alpha AI", "alphaAI", 18));
-        console.log("Alpha AI deployed at: ", mockErc20);
-        mockErc20 = address(new MockERC20("Beta AI", "betaAI", 18));
-        console.log("Beta AI deployed at: ", mockErc20);
-        mockErc20 = address(new MockERC20("Gamma AI", "gammaAI", 18));
-        console.log("Gamma AI deployed at: ", mockErc20);
 
         FlaixCallOption callOption = new FlaixCallOption();
         FlaixPutOption putOption = new FlaixPutOption();
@@ -28,9 +21,8 @@ contract FlaixDeploySepolia is Script {
         FlaixVault vault = new FlaixVault(address(optionFactory));
         console.log("FlaixVault deployed at: ", address(vault));
 
-        FlaixTestGov gov = new FlaixTestGov(address(vault));
-        console.log("FlaixTestGov deployed at: ", address(gov));
-        vault.changeAdmin(address(gov));
+        address admin = address(0xeF0053Dc1469aDAb91134f53032aE5f142f6a146);
+        vault.changeAdmin(address(admin));
 
         vm.stopBroadcast();
     }
