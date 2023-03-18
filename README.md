@@ -119,7 +119,11 @@ Discord (see below).
 
 ### Project Deployments
 
-### Ethereum Mainnet
+#### Ethereum Mainnet
+
+FlaixVault (FLAIX Token): [0xA3dcc50358239De3b09F2733e1F62c0419FA6909](https://etherscan.io/address/0xa3dcc50358239de3b09f2733e1f62c0419fa6909)
+
+:point_right: Please check Discord if you want to purchase FLAIX tokens.
 
 #### Sepolia Testnet
 
