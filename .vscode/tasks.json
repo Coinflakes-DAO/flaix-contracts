@@ -14,6 +14,13 @@
 			"problemMatcher": [],
 			"label": "flaix-contracts: forge test 'only'",
 			"detail": "Run forge test command for flaix-contracts with \"_only\" suffix"
+		},
+		{
+			"type": "shell",
+			"command": "forge script scripts/deployLocal.sol:DeployLocal --fork-url http://localhost:8545 --broadcast",
+			"problemMatcher": [],
+			"label": "flaix-contracts: deploy on localhost",
+			"detail": "Deploy Flaix contract on localhost"
 		}
 	]
 }
