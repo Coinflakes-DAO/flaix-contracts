@@ -3,10 +3,6 @@ pragma solidity ^0.8.16;
 
 import "forge-std/Script.sol";
 import "@src/FlaixVault.sol";
-import "@src/FlaixCallOption.sol";
-import "@src/FlaixPutOption.sol";
-import "@src/FlaixOptionFactory.sol";
-import "@src/FlaixTestGov.sol";
 import "@mock-tokens/MockERC20.sol";
 
 contract DeploySepolia is Script {
@@ -21,16 +17,8 @@ contract DeploySepolia is Script {
         mockErc20 = address(new MockERC20("Gamma AI", "gammaAI", 18));
         console.log("Gamma AI deployed at: ", mockErc20);
 
-        FlaixCallOption callOption = new FlaixCallOption();
-        FlaixPutOption putOption = new FlaixPutOption();
-        FlaixOptionFactory optionFactory = new FlaixOptionFactory(address(callOption), address(putOption));
-
-        FlaixVault vault = new FlaixVault(address(optionFactory));
+        FlaixVault vault = new FlaixVault("Coinflakes AI Vault", "FLAIX");
         console.log("FlaixVault deployed at: ", address(vault));
-
-        FlaixTestGov gov = new FlaixTestGov(address(vault));
-        console.log("FlaixTestGov deployed at: ", address(gov));
-        vault.changeAdmin(address(gov));
 
         vm.stopBroadcast();
     }

@@ -9,19 +9,8 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-import "./FlaixOptionFactory.sol";
-
 import "./interfaces/IFlaixVault.sol";
-import "./interfaces/IFlaixOption.sol";
 
-/// @title FlaixVault
-/// @notice This contract pertains to the FlaixVault contract, which
-///         serves as a means of investing in AI tokens. The contract
-///         is designed to hold tokens that are expected to increase in
-///         value over time. Ownership of the vault is represented by
-///         the FLAIX token, which is a proportional share of the tokens
-///         held by the vault.
-/// @dev This contract is based on the OpenZeppelin ERC20 contract.
 contract FlaixVault is ERC20, IFlaixVault, ReentrancyGuard {
     using EnumerableSet for EnumerableSet.AddressSet;
     using SafeERC20 for IERC20;
@@ -30,85 +19,65 @@ contract FlaixVault is ERC20, IFlaixVault, ReentrancyGuard {
 
     EnumerableSet.AddressSet private _allowedAssets;
 
-    /// @notice The address of the FlaixOptionFactory contract.
-    FlaixOptionFactory public immutable optionFactory;
+    EnumerableSet.AddressSet private _minters;
+    EnumerableSet.AddressSet private _burners;
 
-    /// @notice The address of the admin account. The admin account should be replaced
-    ///         by a multisig contract or even better a DAO in the future.
     address public admin;
 
-    /// @notice When an option is issued, the issuer selects a maturity value, which is the
-    /// point in time when the option can be exercised. The maturity period must be a
-    /// minimum of three days, but the admin account has the ability to adjust the
-    /// minimum maturity period.
-    uint public minimalOptionsMaturity = 3 days;
+    event MinterAdded(address minter);
+    event MinterRemoved(address minter);
 
-    mapping(address => uint) internal minters;
+    event BurnerAdded(address burner);
+    event BurnerRemoved(address burner);
 
     modifier onlyAdmin() {
-        if (_msgSender() != admin) revert IFlaixVault.OnlyAllowedForAdmin();
+        require(msg.sender == admin, "FlaixVault: only allowed for admin");
         _;
     }
 
     /// @dev Constructor
-    constructor(address optionFactory_) ERC20("Coinflakes AI Vault", "FLAIX") {
+    constructor(string memory name, string memory symbol) ERC20(name, symbol) {
         admin = _msgSender();
-        optionFactory = FlaixOptionFactory(optionFactory_);
         emit AdminChanged(admin, address(0));
     }
 
-    /// @inheritdoc IFlaixGovernance
     function changeAdmin(address newAdmin) public onlyAdmin {
-        if (newAdmin == address(0)) revert IFlaixVault.AdminCannotBeNull();
+        require(newAdmin != address(0), "FlaixVault: new admin cannot be null address");
         emit AdminChanged(newAdmin, admin);
         admin = newAdmin;
     }
 
-    /// @inheritdoc IFlaixGovernance
-    function changeMinimalOptionsMaturity(uint newMaturity) public onlyAdmin {
-        if (newMaturity < 3 days) revert IFlaixVault.MaturityChangeBelowLimit();
-        minimalOptionsMaturity = newMaturity;
-    }
-
-    /// @inheritdoc IFlaixGovernance
     function allowAsset(address assetAddress) public onlyAdmin {
-        if (assetAddress == address(0)) revert IFlaixVault.AssetCannotBeNull();
-        if (!_allowedAssets.add(assetAddress)) revert AssetAlreadyOnAllowList();
+        require(assetAddress != address(0), "FlaixVault: asset address cannot be null");
+        require(!_allowedAssets.contains(assetAddress), "FlaixVault: asset already allowed");
+        _allowedAssets.add(assetAddress);
         emit AssetAllowed(assetAddress);
     }
 
-    /// @inheritdoc IFlaixGovernance
     function disallowAsset(address assetAddress) public onlyAdmin {
-        if (!_allowedAssets.remove(assetAddress)) revert AssetNotOnAllowList();
+        require(assetAddress != address(0), "FlaixVault: asset address cannot be null");
+        require(_allowedAssets.contains(assetAddress), "FlaixVault: asset not allowed");
+        _allowedAssets.remove(assetAddress);
         emit AssetDisallowed(assetAddress);
     }
 
-    /// @inheritdoc IFlaixGovernance
     function isAssetAllowed(address assetAddress) public view returns (bool) {
         return _allowedAssets.contains(assetAddress);
     }
 
-    /// @inheritdoc IFlaixGovernance
     function allowedAssets() public view returns (uint256) {
         return _allowedAssets.length();
     }
 
-    /// @inheritdoc IFlaixGovernance
     function allowedAsset(uint256 index) public view returns (address) {
-        if (index >= _allowedAssets.length()) revert IFlaixVault.AssetIndexOutOfBounds();
+        require(index < _allowedAssets.length(), "FlaixVault: index out of bounds");
         return _allowedAssets.at(index);
     }
 
-    /// @inheritdoc IFlaixVault
-    function minterBudgetOf(address minter) public view returns (uint) {
-        return minters[minter];
-    }
-
-    /// @inheritdoc IFlaixVault
     function redeemShares(uint256 amount, address recipient) public nonReentrant {
         if (amount == 0) return;
         if (totalSupply() == 0) return;
-        if (recipient == address(0)) revert IFlaixVault.RecipientCannotBeNullAddress();
+        require(recipient != address(0), "FlaixVault: recipient cannot be null address");
         for (uint256 i = 0; i < _allowedAssets.length(); i++) {
             address asset = _allowedAssets.at(i);
             //slither-disable-next-line calls-loop
@@ -120,83 +89,84 @@ contract FlaixVault is ERC20, IFlaixVault, ReentrancyGuard {
         _burn(msg.sender, amount);
     }
 
-    /// @inheritdoc IFlaixVault
-    function burn(uint256 amount) public {
+    function emergencyExit(uint256 amount, address recipient) public nonReentrant {
+        if (amount == 0) return;
+        if (totalSupply() == 0) return;
+        require(recipient != address(0), "FlaixVault: recipient cannot be null address");
+        for (uint256 i = 0; i < _allowedAssets.length(); i++) {
+            address asset = _allowedAssets.at(i);
+            //slither-disable-next-line calls-loop
+            uint256 assetBalance = IERC20(asset).balanceOf(address(this));
+            uint256 assetAmount = assetBalance.mulDiv(amount, totalSupply(), Math.Rounding.Down);
+            //slither-disable-next-line calls-loop
+            try IERC20(asset).transfer(recipient, assetAmount) {} catch (bytes memory /*lowLevelData*/) {
+                // ignore any errors and just continue to get out as much as possible
+            }
+        }
         _burn(msg.sender, amount);
     }
 
-    /// @inheritdoc IFlaixVault
+    function addMinter(address minter) public onlyAdmin {
+        require(minter != address(0), "FlaixVault: minter cannot be null address");
+        require(!_minters.contains(minter), "FlaixVault: minter already added");
+        _minters.add(minter);
+        emit MinterAdded(minter);
+    }
+
+    function removeMinter(address minter) public onlyAdmin {
+        require(minter != address(0), "FlaixVault: minter cannot be null address");
+        require(_minters.contains(minter), "FlaixVault: minter not added");
+        _minters.remove(minter);
+        emit MinterRemoved(minter);
+    }
+
+    function isMinter(address minter) public view returns (bool) {
+        return _minters.contains(minter);
+    }
+
+    function minters() public view returns (uint256) {
+        return _minters.length();
+    }
+
+    function minterAt(uint256 index) public view returns (address) {
+        require(index < _minters.length(), "FlaixVault: index out of bounds");
+        return _minters.at(index);
+    }
+
+    function addBurner(address burner) public onlyAdmin {
+        require(burner != address(0), "FlaixVault: burner cannot be null address");
+        require(!_burners.contains(burner), "FlaixVault: burner already added");
+        _burners.add(burner);
+        emit BurnerAdded(burner);
+    }
+
+    function removeBurner(address burner) public onlyAdmin {
+        require(burner != address(0), "FlaixVault: burner cannot be null address");
+        require(_burners.contains(burner), "FlaixVault: burner not added");
+        _burners.remove(burner);
+        emit BurnerRemoved(burner);
+    }
+
+    function isBurner(address burner) public view returns (bool) {
+        return _burners.contains(burner);
+    }
+
+    function burners() public view returns (uint256) {
+        return _burners.length();
+    }
+
+    function burnerAt(uint256 index) public view returns (address) {
+        require(index < _burners.length(), "FlaixVault: index out of bounds");
+        return _burners.at(index);
+    }
+
+    function burn(uint256 amount) public {
+        require(_burners.contains(msg.sender), "FlaixVault: only allowed for burners");
+        _burn(msg.sender, amount);
+    }
+
     function mint(uint amount, address recipient) public {
-        if (minters[msg.sender] < amount) revert IFlaixVault.MinterBudgetExceeded();
+        require(_minters.contains(msg.sender), "FlaixVault: only allowed for minters");
         _mint(recipient, amount);
-    }
-
-    function _mint(address account, uint256 amount) internal override {
-        minters[msg.sender] = minters[msg.sender].sub(amount);
-        super._mint(account, amount);
-    }
-
-    /// @inheritdoc IFlaixGovernance
-    function issueCallOptions(
-        string memory name,
-        string memory symbol,
-        uint256 sharesAmount,
-        address recipient,
-        address asset,
-        uint256 assetAmount,
-        uint256 maturityTimestamp
-    ) public onlyAdmin nonReentrant returns (address) {
-        //slither-disable-next-line timestamp
-        if (maturityTimestamp < block.timestamp + minimalOptionsMaturity) revert IFlaixVault.MaturityTooLow();
-        if (!_allowedAssets.contains(asset)) revert IFlaixVault.AssetNotOnAllowList();
-
-        address options = optionFactory.createCallOption(
-            name,
-            symbol,
-            asset,
-            recipient,
-            address(this),
-            sharesAmount,
-            maturityTimestamp
-        );
-        //slither-disable-next-line reentrancy-benign
-        minters[options] = sharesAmount;
-
-        emit IssueCallOptions(options, recipient, name, symbol, sharesAmount, asset, assetAmount, maturityTimestamp);
-        IERC20(asset).safeTransferFrom(msg.sender, options, assetAmount);
-
-        return options;
-    }
-
-    /// @inheritdoc IFlaixGovernance
-    function issuePutOptions(
-        string memory name,
-        string memory symbol,
-        uint256 sharesAmount,
-        address recipient,
-        address asset,
-        uint256 assetAmount,
-        uint maturityTimestamp
-    ) public onlyAdmin nonReentrant returns (address) {
-        //slither-disable-next-line timestamp
-        if (maturityTimestamp < block.timestamp + minimalOptionsMaturity) revert IFlaixVault.MaturityTooLow();
-        if (!_allowedAssets.contains(asset)) revert IFlaixVault.AssetNotOnAllowList();
-
-        address options = optionFactory.createPutOption(
-            name,
-            symbol,
-            asset,
-            recipient,
-            address(this),
-            sharesAmount,
-            maturityTimestamp
-        );
-        emit IssuePutOptions(options, recipient, name, symbol, sharesAmount, asset, assetAmount, maturityTimestamp);
-        IERC20(this).safeTransferFrom(msg.sender, options, sharesAmount);
-        _burn(options, sharesAmount);
-        //slither-disable-next-line reentrancy-benign
-        minters[options] = sharesAmount;
-        IERC20(asset).safeTransfer(options, assetAmount);
-        return options;
     }
 }

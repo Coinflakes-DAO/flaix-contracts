@@ -5,6 +5,6 @@ import "../FlaixVault.t.sol";
 
 contract Name_Test is FlaixVault_Test {
     function test_name() public {
-        assertEq(vault.name(), "Coinflakes AI Vault");
+        assertEq(vault.name(), "Test Vault");
     }
 }

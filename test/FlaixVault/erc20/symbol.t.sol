@@ -5,6 +5,6 @@ import "../FlaixVault.t.sol";
 
 contract Symbol_Test is FlaixVault_Test {
     function test_symbol() public {
-        assertEq(vault.symbol(), "FLAIX");
+        assertEq(vault.symbol(), "VAULT");
     }
 }

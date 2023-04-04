@@ -23,13 +23,13 @@ contract AllowAsset_Test is AssetsAllowList_Test {
 
     function test_whenAssetIsNotAllowed_disallowAsset_reverts() public whenDaiIsNotAllowed {
         vm.prank(users.admin);
-        vm.expectRevert(IFlaixVault.AssetNotOnAllowList.selector);
+        vm.expectRevert(bytes("FlaixVault: asset not allowed"));
         vault.disallowAsset(address(tokens.dai));
     }
 
     function test_whenNullAddressIsPassed_allowAsset_reverts() public {
         vm.prank(users.admin);
-        vm.expectRevert(IFlaixVault.AssetNotOnAllowList.selector);
+        vm.expectRevert(bytes("FlaixVault: asset address cannot be null"));
         vault.disallowAsset(address(0));
     }
 }

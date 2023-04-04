@@ -7,7 +7,7 @@ import "./AdminRole.t.sol";
 contract FlaixVault_changeAmin_Test is AdminRole_Test {
     function test_whenUserIsNotAdmin_revert() public whenUserIsNotAdmin {
         vm.prank(users.admin);
-        vm.expectRevert(IFlaixVault.OnlyAllowedForAdmin.selector);
+        vm.expectRevert(bytes("FlaixVault: only allowed for admin"));
         vault.changeAdmin(users.alice);
     }
 
