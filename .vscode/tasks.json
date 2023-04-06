@@ -10,7 +10,7 @@
 		},
 		{
 			"type": "shell",
-			"command": "forge test -vvv --mt \"_only\"",
+			"command": "source .env && forge test -vvv --mt \"_only\" --fork-url $MAINNET_FORK_URL",
 			"problemMatcher": [],
 			"label": "flaix-contracts: forge test 'only'",
 			"detail": "Run forge test command for flaix-contracts with \"_only\" suffix"
