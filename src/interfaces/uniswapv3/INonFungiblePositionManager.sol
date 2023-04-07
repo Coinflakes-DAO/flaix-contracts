@@ -2,7 +2,7 @@
 pragma solidity ^0.8.16;
 pragma abicoder v2;
 
-interface INonFungiblePositionManager {
+interface INonfungiblePositionManager {
     /// @notice Emitted when liquidity is increased for a position NFT
     /// @dev Also emitted when a token is minted
     /// @param tokenId The ID of the token for which liquidity was increased
@@ -150,4 +150,6 @@ interface INonFungiblePositionManager {
     function burn(uint256 tokenId) external payable;
 
     function factory() external view returns (address);
+
+    function WETH9() external view returns (address);
 }

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity ^0.8.0;
 
-import "@src/libraries/Conversions.sol";
 
 /// @title Provides functions for deriving a pool address from the factory, tokens, and the fee
+/// @dev Ported from Uniswap V3 Core to solidity v0.8.
 library PoolAddress {
     bytes32 internal constant POOL_INIT_CODE_HASH = 0xe34f199b19b2b4f47f68442619d555527d244f78a3297ea89325f843f87b8b54;
 
@@ -34,7 +34,7 @@ library PoolAddress {
     /// @return pool The contract address of the V3 pool
     function computeAddress(address factory, PoolKey memory key) internal pure returns (address pool) {
         require(key.token0 < key.token1);
-        pool = Conversions.uint256ToAddress(uint256(
+        pool = address(uint160(uint256(
                 keccak256(
                     abi.encodePacked(
                         hex'ff',
@@ -42,7 +42,7 @@ library PoolAddress {
                         keccak256(abi.encode(key.token0, key.token1, key.fee)),
                         POOL_INIT_CODE_HASH
                     )
-                )
+                ))
             ));
     }
 }
