@@ -11,9 +11,7 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@mock-tokens/interfaces/IWETH.sol";
 
-import "@src/interfaces/IFlaixVault.sol";
-
-contract UniswapV3PositionMinter is ERC20 {
+contract UniV3WethPosition is ERC20 {
     using Math for uint256;
     using SafeERC20 for IERC20Metadata;
 
@@ -21,9 +19,8 @@ contract UniswapV3PositionMinter is ERC20 {
     bytes32 internal constant POOL_INIT_CODE_HASH = 0xe34f199b19b2b4f47f68442619d555527d244f78a3297ea89325f843f87b8b54;
 
     IERC20Metadata public immutable WETH9;
-    IERC20Metadata public vaultAsset;
+    IERC20Metadata public asset;
 
-    IFlaixVault public immutable vault;
     INonfungiblePositionManager public immutable positionManager;
     IUniswapV3Pool public pool;
 
@@ -57,7 +54,6 @@ contract UniswapV3PositionMinter is ERC20 {
     constructor(
         string memory name,
         string memory symbol,
-        address flaixVault,
         address uniswapPositionManager,
         address uniswapPool
     ) ERC20(name, symbol) {
@@ -65,9 +61,7 @@ contract UniswapV3PositionMinter is ERC20 {
             uniswapPositionManager != address(0),
             "UniswapV3PositionMinter: nonfungiblePositionManager is the zero address"
         );
-        require(flaixVault != address(0), "UniswapV3PositionMinter: flaixVault is the zero address");
 
-        vault = IFlaixVault(flaixVault);
         positionManager = INonfungiblePositionManager(uniswapPositionManager);
         address wethAddress = positionManager.WETH9();
         WETH9 = IWETH(wethAddress);
@@ -79,7 +73,7 @@ contract UniswapV3PositionMinter is ERC20 {
             token0 == address(WETH9) || pool.token1() == address(WETH9),
             "UniswapV3PositionMinter: WETH9 is not a pool token"
         );
-        vaultAsset = pool.token0() == wethAddress ? IERC20Metadata(pool.token1()) : IERC20Metadata(pool.token0());
+        asset = pool.token0() == wethAddress ? IERC20Metadata(pool.token1()) : IERC20Metadata(pool.token0());
         int24 tickSpacing = pool.tickSpacing();
         tickUpper = tickSpacing * (MAX_TICK_DEFAULT / tickSpacing);
         tickLower = -tickUpper;
@@ -87,28 +81,30 @@ contract UniswapV3PositionMinter is ERC20 {
 
     function getRequiredWethAmount(uint256 amount) internal view returns (uint256 wethAmount) {
         uint256 wethPerVaultToken = _getSpotPrice();
-        wethAmount = amount.mulDiv(wethPerVaultToken, 10 ** vaultAsset.decimals());
+        wethAmount = amount.mulDiv(wethPerVaultToken, 10 ** asset.decimals());
     }
 
     function addLiquidity(
         uint256 assetAmount,
         uint256 wethAmount,
-        address recipient,
-        uint256 slippageBps
+        uint256 assetAmountMin,
+        uint256 wethAmountMin,
+        address recipient
     ) public returns (uint256 assetAmountAdded, uint256 wethAmountAdded) {
         require(assetAmount > 0 || wethAmount > 0, "UniswapV3PositionMinter: amount is zero");
         require(recipient != address(0), "UniswapV3PositionMinter: recipient is the zero address");
         WETH9.safeTransferFrom(msg.sender, address(this), wethAmount);
-        vaultAsset.safeTransferFrom(msg.sender, address(this), assetAmount);
+        asset.safeTransferFrom(msg.sender, address(this), assetAmount);
         WETH9.safeApprove(address(positionManager), wethAmount);
-        vaultAsset.safeApprove(address(positionManager), assetAmount);
+        asset.safeApprove(address(positionManager), assetAmount);
         uint256 liquidityCreated = 0;
         if (positionId == 0) {
             (positionId, liquidityCreated, assetAmountAdded, wethAmountAdded) = _mintPosition(
                 assetAmount,
                 wethAmount,
+                assetAmountMin,
+                wethAmountMin,
                 recipient,
-                slippageBps,
                 block.timestamp
             );
             emit MintPosition(msg.sender, recipient, positionId);
@@ -116,12 +112,13 @@ contract UniswapV3PositionMinter is ERC20 {
             (liquidityCreated, assetAmountAdded, wethAmountAdded) = _increaseLiquidity(
                 assetAmount,
                 wethAmount,
+                assetAmountMin,
+                wethAmountMin,
                 recipient,
-                slippageBps,
                 block.timestamp
             );
         }
-        if (assetAmountAdded < assetAmount) vaultAsset.safeTransfer(msg.sender, assetAmount - assetAmountAdded);
+        if (assetAmountAdded < assetAmount) asset.safeTransfer(msg.sender, assetAmount - assetAmountAdded);
         if (wethAmountAdded < wethAmount) WETH9.safeTransfer(msg.sender, wethAmount - wethAmountAdded);
         emit IncreaseLiquidity(msg.sender, recipient, liquidityCreated, assetAmountAdded, wethAmountAdded);
     }
@@ -141,12 +138,12 @@ contract UniswapV3PositionMinter is ERC20 {
         if (token0 == address(WETH9)) {
             WETH9.safeTransfer(recipient, amount0);
         } else {
-            vaultAsset.safeTransfer(recipient, amount0);
+            asset.safeTransfer(recipient, amount0);
         }
         if (token1 == address(WETH9)) {
             WETH9.safeTransfer(recipient, amount1);
         } else {
-            vaultAsset.safeTransfer(recipient, amount1);
+            asset.safeTransfer(recipient, amount1);
         }
         emit DecreaseLiquidity(msg.sender, recipient, liquidity, amount0, amount1);
     }
@@ -154,8 +151,9 @@ contract UniswapV3PositionMinter is ERC20 {
     function _mintPosition(
         uint256 assetAmount,
         uint256 wethAmount,
+        uint256 assetAmountMin,
+        uint256 wethAmountMin,
         address recipient,
-        uint256 slippageBps,
         uint256 deadline
     )
         private
@@ -163,6 +161,8 @@ contract UniswapV3PositionMinter is ERC20 {
     {
         uint256 amount0Desired = token0 == address(WETH9) ? wethAmount : assetAmount;
         uint256 amount1Desired = token1 == address(WETH9) ? wethAmount : assetAmount;
+        uint256 amount0Min = token0 == address(WETH9) ? wethAmountMin : assetAmountMin;
+        uint256 amount1Min = token1 == address(WETH9) ? wethAmountMin : assetAmountMin;
         INonfungiblePositionManager.MintParams memory params = INonfungiblePositionManager.MintParams({
             token0: token0,
             token1: token1,
@@ -171,8 +171,8 @@ contract UniswapV3PositionMinter is ERC20 {
             tickUpper: tickUpper,
             amount0Desired: amount0Desired,
             amount1Desired: amount1Desired,
-            amount0Min: amount0Desired.mulDiv(10000 - slippageBps, 10000),
-            amount1Min: amount1Desired.mulDiv(10000 - slippageBps, 10000),
+            amount0Min: amount0Min,
+            amount1Min: amount1Min,
             recipient: recipient,
             deadline: deadline
         });
@@ -187,19 +187,22 @@ contract UniswapV3PositionMinter is ERC20 {
     function _increaseLiquidity(
         uint256 assetAmount,
         uint256 wethAmount,
+        uint256 assetAmountMin,
+        uint256 wethAmountMin,
         address recipient,
-        uint256 slippageBps,
         uint256 deadline
     ) private returns (uint256 liquidityCreated, uint256 assetAmountAdded, uint256 wethAmountAdded) {
         uint256 amount0Desired = token0 == address(WETH9) ? wethAmount : assetAmount;
         uint256 amount1Desired = token1 == address(WETH9) ? wethAmount : assetAmount;
+        uint256 amount0Min = token0 == address(WETH9) ? wethAmountMin : assetAmountMin;
+        uint256 amount1Min = token1 == address(WETH9) ? wethAmountMin : assetAmountMin;
         INonfungiblePositionManager.IncreaseLiquidityParams memory params = INonfungiblePositionManager
             .IncreaseLiquidityParams({
                 tokenId: positionId,
                 amount0Desired: amount0Desired,
                 amount1Desired: amount1Desired,
-                amount0Min: amount0Desired.mulDiv(10000 - slippageBps, 10000),
-                amount1Min: amount1Desired.mulDiv(10000 - slippageBps, 10000),
+                amount0Min: amount0Min,
+                amount1Min: amount1Min,
                 deadline: deadline
             });
         (uint256 liquidity, uint256 amount0Added, uint256 amount1Added) = positionManager.increaseLiquidity(params);
