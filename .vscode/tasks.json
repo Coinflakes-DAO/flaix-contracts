@@ -3,7 +3,7 @@
 	"tasks": [
 		{
 			"type": "shell",
-			"command": "forge test -vvv",
+			"command": "source .env && forge test -vvv --fork-url $MAINNET_FORK_URL",
 			"problemMatcher": [],
 			"label": "flaix-contracts: forge test",
 			"detail": "Run forge test command for flaix-contracts project"

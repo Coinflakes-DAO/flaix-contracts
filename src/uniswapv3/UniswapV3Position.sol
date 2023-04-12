@@ -11,9 +11,7 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@mock-tokens/interfaces/IWETH.sol";
 
-import "@src/interfaces/IFlaixVault.sol";
-
-contract UniV3Position is ERC20 {
+contract UniswapV3Position is ERC20 {
     using Math for uint256;
     using SafeERC20 for IERC20Metadata;
 
