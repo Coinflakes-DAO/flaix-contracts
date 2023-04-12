@@ -6,6 +6,10 @@ import "@src/uniswapv3/UniswapV3Position.sol";
 
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
+interface IChainlinkPriceFeed {
+    function latestAnswer() external view returns (int256);
+}
+
 contract UniswapV3PositionBaseTest is Base_Test {
     UniswapV3Position public position;
 
@@ -13,15 +17,20 @@ contract UniswapV3PositionBaseTest is Base_Test {
     address public constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
     address public constant POOL = 0x99ac8cA7087fA4A2A1FB6357269965A2014ABc35;
     address public constant UNISWAP_POSITION_MANAGER = 0xC36442b4a4522E871399CD717aBDD847Ab11FE88;
+    address public constant BTC_PRICE_ORACLE = 0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c;
 
-    IERC20Metadata fraxToken = IERC20Metadata(WBTC);
-    IERC20Metadata usdcToken = IERC20Metadata(USDC);
+    IERC20Metadata public wbtcToken = IERC20Metadata(WBTC);
+    IERC20Metadata public usdcToken = IERC20Metadata(USDC);
+
+    IChainlinkPriceFeed priceFeed = IChainlinkPriceFeed(BTC_PRICE_ORACLE);
+    int256 public btcPrice;
 
     function setUp() public override {
         super.setUp();
         setUp_tokens();
         setUp_userFunds();
         setUp_Position();
+        setUp_BTCPriceOracle();
     }
 
     function setUp_userFunds() public {
@@ -31,5 +40,9 @@ contract UniswapV3PositionBaseTest is Base_Test {
 
     function setUp_Position() public {
         position = new UniswapV3Position("Uniswap V3 Test Position", "UNIV3-TEST-POS", UNISWAP_POSITION_MANAGER, POOL);
+    }
+
+    function setUp_BTCPriceOracle() public {
+        btcPrice = priceFeed.latestAnswer();
     }
 }

@@ -5,13 +5,14 @@ pragma abicoder v2;
 import "@src/interfaces/uniswapv3/IUniswapV3Pool.sol";
 import "@src/interfaces/uniswapv3/INonfungiblePositionManager.sol";
 
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@mock-tokens/interfaces/IWETH.sol";
 
-contract UniswapV3Position is ERC20 {
+contract UniswapV3Position is ERC20, ReentrancyGuard {
     using Math for uint256;
     using SafeERC20 for IERC20Metadata;
 
@@ -70,13 +71,13 @@ contract UniswapV3Position is ERC20 {
     }
 
     function getRequiredAmount1(uint256 amount0) public view returns (uint256 amount1) {
-        (uint256 price0, ) = _getSpotPrice();
+        uint256 price0 = _getSpotPrice();
         amount1 = amount0.mulDiv(price0, 10 ** IERC20Metadata(token0).decimals());
     }
 
     function getRequiredAmount0(uint256 amount1) public view returns (uint256 amount0) {
-        (, uint256 price1) = _getSpotPrice();
-        amount0 = amount1.mulDiv(price1, 10 ** IERC20Metadata(token1).decimals());
+        uint256 price0 = _getSpotPrice();
+        amount0 = amount1.mulDiv(10 ** IERC20Metadata(token0).decimals(), price0);
     }
 
     function addLiquidity(
@@ -85,7 +86,7 @@ contract UniswapV3Position is ERC20 {
         uint256 amount0Min,
         uint256 amount1Min,
         address recipient
-    ) public virtual returns (uint256 amount0Added, uint256 amount1Added) {
+    ) public virtual nonReentrant returns (uint256 amount0Added, uint256 amount1Added) {
         require(amount0 > 0 || amount1 > 0, "UniswapV3PositionMinter: amount is zero");
         require(recipient != address(0), "UniswapV3PositionMinter: recipient is the zero address");
         IERC20Metadata(token0).safeTransferFrom(msg.sender, address(this), amount0);
@@ -124,7 +125,7 @@ contract UniswapV3Position is ERC20 {
         uint256 amount1Min,
         address recipient,
         uint256 deadline
-    ) public virtual returns (uint256 amount0, uint256 amount1) {
+    ) public virtual nonReentrant returns (uint256 amount0, uint256 amount1) {
         require(liquidity > 0, "UniswapV3PositionMinter: liquidity is zero");
         require(recipient != address(0), "UniswapV3PositionMinter: recipient is the zero address");
 
@@ -205,14 +206,10 @@ contract UniswapV3Position is ERC20 {
         _burn(address(this), liquidity);
     }
 
-    function _getSpotPrice() internal view returns (uint256 price0, uint256 price1) {
+    function _getSpotPrice() internal view returns (uint256 price0) {
         (uint160 sqrtPriceX96, , , , , , ) = pool.slot0();
         uint256 decimals0 = IERC20Metadata(token0).decimals();
-        uint256 decimals1 = IERC20Metadata(token1).decimals();
         uint256 price = uint256(sqrtPriceX96) * uint256(sqrtPriceX96);
-        uint256 oneToken0 = 10 ** decimals0;
-        uint256 oneToken1 = 10 ** decimals1;
-        price0 = price.mulDiv(oneToken0, 1 << 192);
-        price1 = oneToken1.mulDiv(price0, oneToken0);
+        price0 = price.mulDiv(10 ** decimals0, 1 << 192);
     }
 }

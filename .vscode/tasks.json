@@ -17,6 +17,13 @@
 		},
 		{
 			"type": "shell",
+			"command": "source .env && forge test -vvv --mp \"test/UniswapV3Position/**/*\" --fork-url $MAINNET_FORK_URL",
+			"problemMatcher": [],
+			"label": "flaix-contracts: forge test 'UniswapV3Position'",
+			"detail": "Run forge test command for UniswapV3Position in flaix-contracts "
+		},
+		{
+			"type": "shell",
 			"command": "forge script scripts/deployLocal.sol:DeployLocal --fork-url http://localhost:8545 --broadcast",
 			"problemMatcher": [],
 			"label": "flaix-contracts: deploy on localhost",
