@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 import "@test/Base.t.sol";
 import "@src/uniswapv3/UniswapV3Position.sol";
 
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 interface IChainlinkPriceFeed {
@@ -87,6 +88,24 @@ contract UniswapV3PositionBaseTest is Base_Test {
 
     modifier whenToken1IsUsdc() {
         assertEq(position.pool().token1(), USDC);
+        _;
+    }
+
+    modifier whenUserHasAddedLiquidity(address user, uint256 wbtcAmount) {
+        deal(WBTC, user, wbtcAmount, true);
+        uint256 usdcAmount = position.getRequiredAmount1(wbtcAmount);
+        deal(USDC, user, usdcAmount, true);
+        vm.startPrank(user);
+        wbtcToken.approve(address(position), wbtcAmount);
+        usdcToken.approve(address(position), usdcAmount);
+        position.addLiquidity(wbtcAmount, usdcAmount, 0, 0, user, block.timestamp);
+        vm.stopPrank();
+        _;
+    }
+
+    modifier whenUserHasApprovedLiquidity(address user) {
+        vm.prank(user);
+        position.approve(address(position), 2 ** 256 - 1);
         _;
     }
 

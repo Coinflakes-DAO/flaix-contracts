@@ -108,7 +108,8 @@ contract UniswapV3Position is ERC20, ReentrancyGuard {
         uint256 amount1,
         uint256 amount0Min,
         uint256 amount1Min,
-        address recipient
+        address recipient,
+        uint256 deadline
     ) public virtual nonReentrant returns (uint256 liquidityAdded, uint256 amount0Added, uint256 amount1Added) {
         require(amount0 > 0 || amount1 > 0, "UniswapV3Position: amount is zero");
         require(recipient != address(0), "UniswapV3Position: recipient is the zero address");
@@ -136,7 +137,7 @@ contract UniswapV3Position is ERC20, ReentrancyGuard {
                 amount0Min,
                 amount1Min,
                 recipient,
-                block.timestamp
+                deadline
             );
         }
         if (amount0Added < amount0) IERC20Metadata(token0).safeTransfer(msg.sender, amount0 - amount0Added);
@@ -185,7 +186,7 @@ contract UniswapV3Position is ERC20, ReentrancyGuard {
             amount1Desired: amount1Desired,
             amount0Min: amount0Min,
             amount1Min: amount1Min,
-            recipient: recipient,
+            recipient: address(this),
             deadline: deadline
         });
         (uint256 tokenId, uint256 liquidity, uint256 amount0Added_, uint256 amount1Added_) = positionManager.mint(
@@ -234,6 +235,7 @@ contract UniswapV3Position is ERC20, ReentrancyGuard {
                 deadline: deadline
             });
         (amount0, amount1) = positionManager.decreaseLiquidity(params);
+
         _burn(address(this), liquidity);
     }
 

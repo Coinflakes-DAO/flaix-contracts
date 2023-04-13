@@ -19,10 +19,11 @@ contract AddLiquidityTest is UniswapV3PositionBaseTest {
         vm.startPrank(users.alice);
         uint256 amount0Min = withSlippage(amount0, 1000 /* bps */);
         uint256 amount1Min = withSlippage(amount1, 1000 /* bps */);
-        position.addLiquidity(amount0, amount1, amount0Min, amount1Min, users.alice);
+        position.addLiquidity(amount0, amount1, amount0Min, amount1Min, users.alice, block.timestamp);
         vm.stopPrank();
 
         assertGt(position.positionId(), 0);
+        assertEq(position.positionManager().ownerOf(position.positionId()), address(position));
     }
 
     function test_addLiquidity_mintsNewLPs()
@@ -40,7 +41,7 @@ contract AddLiquidityTest is UniswapV3PositionBaseTest {
         vm.startPrank(users.alice);
         uint256 amount0Min = withSlippage(amount0, 1000 /* bps */);
         uint256 amount1Min = withSlippage(amount1, 1000 /* bps */);
-        position.addLiquidity(amount0, amount1, amount0Min, amount1Min, users.alice);
+        position.addLiquidity(amount0, amount1, amount0Min, amount1Min, users.alice, block.timestamp);
         vm.stopPrank();
         assertGt(position.balanceOf(users.alice), 0);
     }
@@ -60,7 +61,7 @@ contract AddLiquidityTest is UniswapV3PositionBaseTest {
         vm.startPrank(users.alice);
         uint256 amount0Min = withSlippage(amount0, 1000 /* bps */);
         uint256 amount1Min = withSlippage(amount1, 1000 /* bps */);
-        position.addLiquidity(amount0, amount1, amount0Min, amount1Min, users.alice);
+        position.addLiquidity(amount0, amount1, amount0Min, amount1Min, users.alice, block.timestamp);
         vm.stopPrank();
         assertGt(position.positionId(), 0);
 
@@ -70,7 +71,7 @@ contract AddLiquidityTest is UniswapV3PositionBaseTest {
         vm.startPrank(users.alice);
         amount0Min = withSlippage(amount0, 1000 /* bps */);
         amount1Min = withSlippage(amount1, 1000 /* bps */);
-        position.addLiquidity(amount0, amount1, amount0Min, amount1Min, users.alice);
+        position.addLiquidity(amount0, amount1, amount0Min, amount1Min, users.alice, block.timestamp);
         vm.stopPrank();
         assertEq(position.positionId(), positionId);
     }
@@ -100,7 +101,7 @@ contract AddLiquidityTest is UniswapV3PositionBaseTest {
         emit MintPosition(users.alice, users.alice, 0);
         vm.expectEmit(true, true, false, false, address(position));
         emit IncreaseLiquidity(users.alice, users.alice, 0, 0, 0);
-        position.addLiquidity(amount0, amount1, 0, 0, users.alice);
+        position.addLiquidity(amount0, amount1, 0, 0, users.alice, block.timestamp);
         vm.stopPrank();
     }
 
@@ -125,7 +126,8 @@ contract AddLiquidityTest is UniswapV3PositionBaseTest {
             amount1Desired,
             amount0Min,
             amount1Min,
-            users.alice
+            users.alice,
+            block.timestamp
         );
         vm.stopPrank();
         uint256 amount0After = wbtcToken.balanceOf(users.alice);
@@ -146,7 +148,7 @@ contract AddLiquidityTest is UniswapV3PositionBaseTest {
         uint256 amount1Desired = position.getRequiredAmount1(amount0Desired);
         vm.startPrank(users.alice);
         vm.expectRevert();
-        position.addLiquidity(amount0Desired, amount1Desired, 0, 0, users.alice);
+        position.addLiquidity(amount0Desired, amount1Desired, 0, 0, users.alice, block.timestamp);
         vm.stopPrank();
     }
 
@@ -162,7 +164,7 @@ contract AddLiquidityTest is UniswapV3PositionBaseTest {
         uint256 amount1Desired = position.getRequiredAmount1(amount0Desired);
         vm.startPrank(users.alice);
         vm.expectRevert();
-        position.addLiquidity(amount0Desired, amount1Desired, 0, 0, users.alice);
+        position.addLiquidity(amount0Desired, amount1Desired, 0, 0, users.alice, block.timestamp);
         vm.stopPrank();
     }
 }

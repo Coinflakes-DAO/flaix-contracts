@@ -2,8 +2,10 @@
 pragma solidity ^0.8.16;
 pragma abicoder v2;
 
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+
 /// @dev Derived from uniswap-v3-core/contracts/interfaces/INonfungiblePositionManager.sol
-interface INonfungiblePositionManager {
+interface INonfungiblePositionManager is IERC721 {
     function positions(
         uint256 tokenId
     )
