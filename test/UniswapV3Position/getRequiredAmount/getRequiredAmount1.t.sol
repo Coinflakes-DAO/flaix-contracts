@@ -21,4 +21,9 @@ contract GetRequirdAmount1Test is UniswapV3PositionBaseTest {
         assertLe(amount1, amountUsd + amountUsd / 10);
         assertGe(amount1, amountUsd - amountUsd / 10);
     }
+
+    function test_getRequiredAmount1_withZero_returnsZero() public {
+        uint256 amount1 = position.getRequiredAmount1(0);
+        assertEq(amount1, 0);
+    }
 }

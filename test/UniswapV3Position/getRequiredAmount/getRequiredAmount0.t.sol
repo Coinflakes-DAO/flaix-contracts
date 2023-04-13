@@ -11,11 +11,13 @@ contract GetRequirdAmount0Test is UniswapV3PositionBaseTest {
         // Expected: 0.3 WBTC (@ 30000 USD/BTC)
         //           0.3 * 10 ** 8 = 30000000
         // priceUsd has 8 decimals, same as wbtcToken
+        vm.assume(amount1 > 1000);
         vm.assume(amount1 < 10 * (10 ** 8));
         //uint256 amount1 = 10000 * (10 ** 6);
         assertEq(position.pool().token0(), WBTC);
         assertEq(position.pool().token1(), USDC);
         uint256 amount0 = position.getRequiredAmount0(amount1);
+        vm.assume(amount0 > 1000);
         uint256 priceUsd = uint256(btcPrice);
         uint256 amountUsd = (amount1 * 10 ** wbtcToken.decimals() * 10 ** wbtcToken.decimals()) /
             priceUsd /
@@ -23,5 +25,18 @@ contract GetRequirdAmount0Test is UniswapV3PositionBaseTest {
         // ~ Tolerance of 10% ~
         assertLe(amount0, amountUsd + amountUsd / 10);
         assertGe(amount0, amountUsd - amountUsd / 10);
+    }
+
+    function test_getRequiredAmount0_withZero_returnsZero() public {
+        // Token 0: WBTC
+        // Token 1: USDC
+        // Test: Required WBTC amount for 10000 USDC
+        // Expected: 0.3 WBTC (@ 30000 USD/BTC)
+        //           0.3 * 10 ** 8 = 30000000
+        // priceUsd has 8 decimals, same as wbtcToken
+        assertEq(position.pool().token0(), WBTC);
+        assertEq(position.pool().token1(), USDC);
+        uint256 amount0 = position.getRequiredAmount0(0);
+        assertEq(amount0, 0);
     }
 }

@@ -2,18 +2,23 @@
 pragma solidity ^0.8.0;
 pragma abicoder v2;
 
+import "@src/interfaces/IFeeCollector.sol";
 import "@src/interfaces/uniswapv3/IUniswapV3Pool.sol";
 import "@src/interfaces/uniswapv3/INonfungiblePositionManager.sol";
 
+import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@mock-tokens/interfaces/IWETH.sol";
 
 contract UniswapV3Position is ERC20, ReentrancyGuard {
+    using Address for address;
     using Math for uint256;
+    using SafeMath for uint256;
     using SafeERC20 for IERC20Metadata;
 
     int24 internal constant MAX_TICK_DEFAULT = 887272;
@@ -30,6 +35,9 @@ contract UniswapV3Position is ERC20, ReentrancyGuard {
     address private token0;
     address private token1;
     uint24 private poolFee;
+
+    address public feeCollector;
+    bool private isFeeCollectorContract;
 
     event MintPosition(address indexed sender, address indexed recipient, uint256 indexed positionId);
 
@@ -53,11 +61,12 @@ contract UniswapV3Position is ERC20, ReentrancyGuard {
         string memory name,
         string memory symbol,
         address uniswapPositionManager,
-        address uniswapPool
+        address uniswapPool,
+        address feeCollectorAddress
     ) ERC20(name, symbol) {
         require(
             uniswapPositionManager != address(0),
-            "UniswapV3PositionMinter: nonfungiblePositionManager is the zero address"
+            "UniswapV3Position: nonfungiblePositionManager is the zero address"
         );
         positionManager = INonfungiblePositionManager(uniswapPositionManager);
 
@@ -68,6 +77,20 @@ contract UniswapV3Position is ERC20, ReentrancyGuard {
         int24 tickSpacing = pool.tickSpacing();
         tickUpper = tickSpacing * (MAX_TICK_DEFAULT / tickSpacing);
         tickLower = -tickUpper;
+
+        require(feeCollectorAddress != address(0), "UniswapV3Position: feeCollector is the zero address");
+        feeCollector = feeCollectorAddress;
+        isFeeCollectorContract = feeCollector.isContract();
+        if (isFeeCollectorContract) {
+            try IFeeCollector(feeCollector).onFeesReceived(token0, token1, 0, 0) returns (bytes4 retval) {
+                require(
+                    retval == IFeeCollector.onFeesReceived.selector,
+                    "UniswapV3Position: feeCollector.onFeesReceived, invalid return value"
+                );
+            } catch {
+                revert("UniswapV3Position: feeCollector.onFeesReceived, test call failed");
+            }
+        }
     }
 
     function getRequiredAmount1(uint256 amount0) public view returns (uint256 amount1) {
@@ -86,11 +109,13 @@ contract UniswapV3Position is ERC20, ReentrancyGuard {
         uint256 amount0Min,
         uint256 amount1Min,
         address recipient
-    ) public virtual nonReentrant returns (uint256 amount0Added, uint256 amount1Added) {
-        require(amount0 > 0 || amount1 > 0, "UniswapV3PositionMinter: amount is zero");
-        require(recipient != address(0), "UniswapV3PositionMinter: recipient is the zero address");
+    ) public virtual nonReentrant returns (uint256 liquidityAdded, uint256 amount0Added, uint256 amount1Added) {
+        require(amount0 > 0 || amount1 > 0, "UniswapV3Position: amount is zero");
+        require(recipient != address(0), "UniswapV3Position: recipient is the zero address");
         IERC20Metadata(token0).safeTransferFrom(msg.sender, address(this), amount0);
         IERC20Metadata(token1).safeTransferFrom(msg.sender, address(this), amount1);
+        IERC20Metadata(token0).safeApprove(address(positionManager), 0);
+        IERC20Metadata(token1).safeApprove(address(positionManager), 0);
         IERC20Metadata(token0).safeApprove(address(positionManager), amount0);
         IERC20Metadata(token1).safeApprove(address(positionManager), amount1);
         uint256 liquidity = 0;
@@ -105,7 +130,7 @@ contract UniswapV3Position is ERC20, ReentrancyGuard {
             );
             emit MintPosition(msg.sender, recipient, positionId);
         } else {
-            (liquidity, amount0Added, amount1Added) = _increaseLiquidity(
+            (liquidityAdded, amount0Added, amount1Added) = _increaseLiquidity(
                 amount0,
                 amount1,
                 amount0Min,
@@ -116,7 +141,7 @@ contract UniswapV3Position is ERC20, ReentrancyGuard {
         }
         if (amount0Added < amount0) IERC20Metadata(token0).safeTransfer(msg.sender, amount0 - amount0Added);
         if (amount1Added < amount1) IERC20Metadata(token1).safeTransfer(msg.sender, amount1 - amount1Added);
-        emit IncreaseLiquidity(msg.sender, recipient, liquidity, amount0Added, amount1Added);
+        emit IncreaseLiquidity(msg.sender, recipient, liquidityAdded, amount0Added, amount1Added);
     }
 
     function removeLiquidity(
@@ -126,10 +151,16 @@ contract UniswapV3Position is ERC20, ReentrancyGuard {
         address recipient,
         uint256 deadline
     ) public virtual nonReentrant returns (uint256 amount0, uint256 amount1) {
-        require(liquidity > 0, "UniswapV3PositionMinter: liquidity is zero");
-        require(recipient != address(0), "UniswapV3PositionMinter: recipient is the zero address");
+        require(liquidity > 0, "UniswapV3Position: liquidity is zero");
+        require(recipient != address(0), "UniswapV3Position: recipient is the zero address");
+
+        (uint256 feesAmount0, uint256 feesAmount1) = _collectFees();
+        IERC20Metadata(token0).transfer(address(feeCollector), feesAmount0);
+        IERC20Metadata(token1).transfer(address(feeCollector), feesAmount1);
+        if (isFeeCollectorContract) _callOnFeesReceived(amount0, amount1);
 
         IERC20Metadata(this).safeTransferFrom(msg.sender, address(this), liquidity);
+
         (amount0, amount1) = _removeLiquidity(liquidity, amount0Min, amount1Min, deadline);
         IERC20Metadata(token0).safeTransfer(recipient, amount0);
         IERC20Metadata(token1).safeTransfer(recipient, amount1);
@@ -206,10 +237,24 @@ contract UniswapV3Position is ERC20, ReentrancyGuard {
         _burn(address(this), liquidity);
     }
 
+    function _collectFees() internal returns (uint256 amount0, uint256 amount1) {
+        INonfungiblePositionManager.CollectParams memory params = INonfungiblePositionManager.CollectParams({
+            tokenId: positionId,
+            recipient: address(this),
+            amount0Max: type(uint128).max,
+            amount1Max: type(uint128).max
+        });
+        (amount0, amount1) = positionManager.collect(params);
+    }
+
     function _getSpotPrice() internal view returns (uint256 price0) {
         (uint160 sqrtPriceX96, , , , , , ) = pool.slot0();
         uint256 decimals0 = IERC20Metadata(token0).decimals();
         uint256 price = uint256(sqrtPriceX96) * uint256(sqrtPriceX96);
         price0 = price.mulDiv(10 ** decimals0, 1 << 192);
+    }
+
+    function _callOnFeesReceived(uint256 amount0, uint256 amount1) private {
+        try IFeeCollector(feeCollector).onFeesReceived(token0, token1, amount0, amount1) {} catch {}
     }
 }

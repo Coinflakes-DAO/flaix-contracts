@@ -28,21 +28,69 @@ contract UniswapV3PositionBaseTest is Base_Test {
     function setUp() public override {
         super.setUp();
         setUp_tokens();
-        setUp_userFunds();
         setUp_Position();
         setUp_BTCPriceOracle();
     }
 
-    function setUp_userFunds() public {
-        deal(WBTC, users.alice, 10 * 10 ** 8, true);
-        deal(USDC, users.alice, 10000 * 10 ** 6, true);
-    }
-
     function setUp_Position() public {
-        position = new UniswapV3Position("Uniswap V3 Test Position", "UNIV3-TEST-POS", UNISWAP_POSITION_MANAGER, POOL);
+        position = new UniswapV3Position(
+            "Uniswap V3 Test Position",
+            "UNIV3-TEST-POS",
+            UNISWAP_POSITION_MANAGER,
+            POOL,
+            users.bob
+        );
     }
 
     function setUp_BTCPriceOracle() public {
         btcPrice = priceFeed.latestAnswer();
+    }
+
+    modifier whenUserHasUsdc(address user, uint256 usdcAmount) {
+        deal(USDC, user, usdcAmount, true);
+        _;
+    }
+
+    modifier whenUserHasEnoughUsdc(address user, uint256 wbtcAmount) {
+        uint256 usdcAmount = position.getRequiredAmount1(wbtcAmount);
+        deal(USDC, user, usdcAmount, true);
+        _;
+    }
+
+    modifier whenUserHasWbtc(address user, uint256 wbtcAmount) {
+        deal(WBTC, user, wbtcAmount, true);
+        _;
+    }
+
+    modifier whenUserHasEnoughWbtc(address user, uint256 usdcAmount) {
+        uint256 wbtcAmount = position.getRequiredAmount0(usdcAmount);
+        deal(WBTC, user, wbtcAmount, true);
+        _;
+    }
+
+    modifier whenUserHasApprovedWbtc(address user) {
+        vm.prank(user);
+        wbtcToken.approve(address(position), 2 ** 256 - 1);
+        _;
+    }
+
+    modifier whenUserHasApprovedUsdc(address user) {
+        vm.prank(user);
+        usdcToken.approve(address(position), 2 ** 256 - 1);
+        _;
+    }
+
+    modifier whenToken0IsWbtc() {
+        assertEq(position.pool().token0(), WBTC);
+        _;
+    }
+
+    modifier whenToken1IsUsdc() {
+        assertEq(position.pool().token1(), USDC);
+        _;
+    }
+
+    function withSlippage(uint256 amount, uint256 bps) internal pure returns (uint256) {
+        return amount - (amount * bps) / 10000;
     }
 }
