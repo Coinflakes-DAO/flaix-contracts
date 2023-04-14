@@ -49,23 +49,27 @@ contract UniswapV3PositionBaseTest is Base_Test {
 
     modifier whenUserHasUsdc(address user, uint256 usdcAmount) {
         deal(USDC, user, usdcAmount, true);
+        assertEq(usdcToken.balanceOf(user), usdcAmount);
         _;
     }
 
     modifier whenUserHasEnoughUsdc(address user, uint256 wbtcAmount) {
         uint256 usdcAmount = position.getRequiredAmount1(wbtcAmount);
         deal(USDC, user, usdcAmount, true);
+        assertEq(usdcToken.balanceOf(user), usdcAmount);
         _;
     }
 
     modifier whenUserHasWbtc(address user, uint256 wbtcAmount) {
         deal(WBTC, user, wbtcAmount, true);
+        assertEq(wbtcToken.balanceOf(user), wbtcAmount);
         _;
     }
 
     modifier whenUserHasEnoughWbtc(address user, uint256 usdcAmount) {
         uint256 wbtcAmount = position.getRequiredAmount0(usdcAmount);
         deal(WBTC, user, wbtcAmount, true);
+        assertEq(wbtcToken.balanceOf(user), wbtcAmount);
         _;
     }
 

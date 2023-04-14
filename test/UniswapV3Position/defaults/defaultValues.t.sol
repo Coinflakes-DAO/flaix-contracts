@@ -27,4 +27,8 @@ contract PoolAddressDefaultValue is UniswapV3PositionBaseTest {
     function test_token1_defaultValue() public {
         assertEq(position.pool().token1(), USDC);
     }
+
+    function test_feeCollector_defaultValue() public {
+        assertEq(address(position.feeCollector()), users.bob);
+    }
 }

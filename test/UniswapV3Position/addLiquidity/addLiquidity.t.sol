@@ -77,7 +77,7 @@ contract AddLiquidityTest is UniswapV3PositionBaseTest {
     }
 
     event MintPosition(address indexed sender, address indexed recipient, uint256 indexed positionId);
-    event IncreaseLiquidity(
+    event AddLiquidity(
         address indexed sender,
         address indexed recipient,
         uint256 liquidity,
@@ -100,7 +100,7 @@ contract AddLiquidityTest is UniswapV3PositionBaseTest {
         vm.expectEmit(true, true, false, false, address(position));
         emit MintPosition(users.alice, users.alice, 0);
         vm.expectEmit(true, true, false, false, address(position));
-        emit IncreaseLiquidity(users.alice, users.alice, 0, 0, 0);
+        emit AddLiquidity(users.alice, users.alice, 0, 0, 0);
         position.addLiquidity(amount0, amount1, 0, 0, users.alice, block.timestamp);
         vm.stopPrank();
     }

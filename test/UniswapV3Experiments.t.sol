@@ -26,7 +26,7 @@ contract UniswapV3Experiments_Test is Base_Test {
         super.setUp();
     }
 
-    function test_uniswapv3_CRV_vs_eth_only() public {
+    function test_uniswapv3_CRV_vs_eth() public {
         IWETH weth = IWETH(WETH);
         IERC20 crv = IERC20(CRV);
         uint24 poolFee = 3000;
