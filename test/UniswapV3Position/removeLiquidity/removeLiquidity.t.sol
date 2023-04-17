@@ -84,7 +84,7 @@ contract RemoveLiquidityTest is UniswapV3PositionBaseTest {
         vm.stopPrank();
     }
 
-    function test_removeLiquidity_collectsFees_only()
+    function test_removeLiquidity_collectsFees()
         public
         whenUserHasAddedLiquidity(users.alice, 1 * 10 ** 8)
         whenUserHasApprovedLiquidity(users.alice)
